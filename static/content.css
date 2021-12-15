@@ -1,0 +1,46 @@
+.gfmplus-preview-wrapper {
+  position: relative;
+}
+
+.gfmplus-preview {
+  display: inline-block;
+  position: absolute;
+  z-index: 99;
+  top: 5px;
+  right: 5px;
+  width: 60%;
+  opacity: 80%;
+  background-color: rgb(246, 248, 250);
+}
+
+div[id^="gfmplus_render_graph_"] {
+  border: 1px solid rgb(246, 248, 250);
+}
+
+ul.gfmplus-render-tabs {
+  display: flex;
+	margin: 0px !important;
+	padding: 0px !important;
+	list-style: none;
+}
+
+ul.gfmplus-render-tabs li {
+	margin: 0px !important;
+  border: 1px solid rgb(246, 248, 250);
+	border-radius: 4px 4px 0 0;
+  width: 10em;
+	height: 2em;
+  cursor: pointer;
+  text-align: center;
+  background-color: white;
+  pointer-events: auto;
+}
+
+ul.gfmplus-render-tabs li.active {
+  background-color: rgb(246, 248, 250);
+  pointer-events: none;
+}
+
+.gfmplus-render > *:not(.active) {
+  display: none;
+}

@@ -1,0 +1,23 @@
+{
+  "name": "GitHub Flavored Markdown Plus",
+  "version": "0.0.4",
+  "manifest_version": 3,
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "options_page": "popup.html",
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*", "https://gist.github.com/*"],
+			"css": ["content.css"],
+      "js": ["mermaid/mermaid.min.js", "katex/katex.min.js", "content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": ["https://github.com/*", "https://gist.github.com/*"],
+      "resources": ["katex/katex.min.css", "katex/fonts/*"]
+    }
+  ]
+}
