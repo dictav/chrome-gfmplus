@@ -1,6 +1,6 @@
 {
   "name": "GitHub Flavored Markdown Plus",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "manifest_version": 3,
   "permissions": ["storage"],
   "action": {
@@ -10,7 +10,7 @@
   "content_scripts": [
     {
       "matches": ["https://github.com/*", "https://gist.github.com/*"],
-			"css": ["content.css"],
+      "css": ["content.css"],
       "js": ["mermaid/mermaid.min.js", "katex/katex.min.js", "content.js"]
     }
   ],

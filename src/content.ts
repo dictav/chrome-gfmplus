@@ -1,6 +1,14 @@
 import type { Plugin } from "./plugins";
 import Plugins from "./plugins";
 
+type PluginCode = {
+  plugin: Plugin;
+  lang: string;
+  code: string;
+  start: number;
+  end: number;
+};
+
 async function init() {
   // @ts-ignore
   mermaid.mermaidAPI.initialize({ startOnLoad: false });
@@ -37,9 +45,7 @@ function observeIssueBody() {
 
   for (const item of Array.from(textareaList)) {
     const textarea = item as HTMLTextAreaElement;
-    for (const plugin of Plugins) {
-      previewPluginInTextarea(plugin, textarea);
-    }
+    previewPluginInTextarea(textarea);
   }
 
   // loop
@@ -51,9 +57,7 @@ function observeNewComment() {
 
   for (const item of Array.from(textareaList)) {
     const textarea = item as HTMLTextAreaElement;
-    for (const plugin of Plugins) {
-      previewPluginInTextarea(plugin, textarea);
-    }
+    previewPluginInTextarea(textarea);
   }
 
   // loop
@@ -67,9 +71,7 @@ function observeNewCodeAndGist() {
 
   for (const item of Array.from(codeMirrorList)) {
     const div = item as HTMLDivElement;
-    for (const plugin of Plugins) {
-      previewPluginInCodeMirror(plugin, div);
-    }
+    previewPluginInCodeMirror(div);
   }
 
   // loop
@@ -78,71 +80,51 @@ function observeNewCodeAndGist() {
 
 const previewCodeCache: { [key: string]: string } = {};
 
-async function previewPluginInTextarea(
-  plugin: Plugin,
-  textarea: HTMLTextAreaElement
-) {
-  const setting = await plugin.setting();
-  if (!setting.enabled) {
+async function previewPluginInTextarea(textarea: HTMLTextAreaElement) {
+  const preview = getPreviewElem(textarea);
+  const pluginCodes = await getPluginCodes(textarea.value);
+
+  if (pluginCodes.length === 0) {
+    preview.classList.add("hidden");
     return;
   }
 
-  const id = textarea.id;
-  const codes = getPluginCodes(setting.lang, textarea.value);
-
-  if (codes.length === 0) {
-    return;
-  }
+  preview.classList.remove("hidden");
 
   const pos = textarea.selectionStart;
-  let code = "";
+  let pluginCode = pluginCodes[0];
 
-  for (const c of codes) {
+  for (const c of pluginCodes) {
     if (c.start <= pos && pos <= c.end) {
-      code = c.code;
+      pluginCode = c;
+      break;
     }
   }
 
-  if (code === "") {
-    if (previewCodeCache[textarea.id]) {
-      return;
-    }
-
-    code = codes[0].code;
-  }
+  const { plugin, code } = pluginCode;
 
   if (code === previewCodeCache[textarea.id]) {
     return;
   }
 
-  previewCodeCache[id] = code;
+  previewCodeCache[textarea.id] = code;
 
-  const elem = getPreviewElem(textarea);
-
-  plugin.render(elem, code);
+  plugin.render(preview, code);
 }
 
-async function previewPluginInCodeMirror(
-  plugin: Plugin,
-  codeMirror: HTMLDivElement
-) {
-  const setting = await plugin.setting();
-  if (!setting.enabled) {
-    return;
-  }
-
+async function previewPluginInCodeMirror(codeMirror: HTMLDivElement) {
   const id = codeMirror.id;
   const lines = Array.from(codeMirror.querySelectorAll("pre.CodeMirror-line"));
   const value = lines.map((line) => line.textContent).join("\n");
 
-  const codes = getPluginCodes(setting.lang, value);
+  const pluginCodes = await getPluginCodes(value);
 
-  if (codes.length === 0) {
+  if (pluginCodes.length === 0) {
     return;
   }
 
+  let pluginCode = pluginCodes[0];
   let pos = 0;
-  let code = "";
 
   const sel = document.getSelection();
   const node = sel?.focusNode?.parentNode;
@@ -160,19 +142,14 @@ async function previewPluginInCodeMirror(
     pos += sel.focusOffset;
   }
 
-  for (const c of codes) {
+  for (const c of pluginCodes) {
     if (c.start <= pos && pos <= c.end) {
-      code = c.code;
+      pluginCode = c;
+      break;
     }
   }
 
-  if (code === "") {
-    if (previewCodeCache[id]) {
-      return;
-    }
-
-    code = codes[0].code;
-  }
+  const { plugin, code } = pluginCode;
 
   if (code === previewCodeCache[id]) {
     return;
@@ -193,13 +170,26 @@ async function previewPluginInCodeMirror(
       .parentElement!.parentElement!
   );
 
-  console.log("rendering", plugin.name, setting.lang);
   plugin.render(elem, code);
 }
 
-function getPluginCodes(plugin: string, value: string) {
-  const re = new RegExp("^```" + plugin + "\n[^`]*```", "gm");
-  const m = value.match(re);
+async function getPluginCodes(value: string): Promise<PluginCode[]> {
+  const langPluginMap = new Map();
+
+  for (const plugin of Plugins) {
+    const setting = await plugin.setting();
+    if (setting.enabled) {
+      langPluginMap.set(setting.lang, plugin);
+    }
+  }
+
+  if (langPluginMap.size === 0) {
+    return [];
+  }
+
+  const cond = "(" + Array.from(langPluginMap.keys()).join("|") + ")";
+  const re = new RegExp("^```" + cond + "\n[^`]*```", "gm");
+  const m = Array.from(value.matchAll(re));
 
   if (!m) {
     return [];
@@ -208,10 +198,13 @@ function getPluginCodes(plugin: string, value: string) {
   const codes = [];
 
   for (let i = 0; i < m.length; i++) {
-    const code = m[i];
+    const code = m[i][0];
+    const lang = m[i][1];
     const start = value.indexOf(code);
     codes[i] = {
-      code: code.substring(plugin.length + 4, code.length - 3),
+      plugin: langPluginMap.get(lang),
+      lang,
+      code: code.substring(lang.length + 4, code.length - 3),
       start,
       end: start + code.length,
     };
@@ -275,13 +268,13 @@ function renderPreElem(src: HTMLPreElement, plugin: Plugin, id: string) {
   renderBox.classList.add("gfmplus-render");
   const graph = document.createElement("div");
   graph.id = `gfmplus_render_graph_${plugin.name}_${id}`;
-	graph.classList.add("active");
+  graph.classList.add("active");
 
   renderBox.appendChild(graph);
   renderBox.appendChild(src);
 
   wrapper.appendChild(tabs);
-	wrapper.appendChild(renderBox);
+  wrapper.appendChild(renderBox);
 
   graphTab.addEventListener("click", function () {
     graphTab.classList.add("active");
