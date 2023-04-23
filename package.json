@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "katex": "^0.15.1",
-    "mermaid": "^8.13.8"
+    "mermaid": "^10.1.0"
   },
   "type": "module"
 }
